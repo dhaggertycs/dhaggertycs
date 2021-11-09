@@ -1,6 +1,6 @@
 - 👋 Hi, I’m @dhaggertycs
 - 👀 I’m interested in data
-- 🌱 I’m currently learning python with pyspark for big data
+- 🌱 I’m currently learning python and pandas
 - 💞️ I’m looking to collaborate on ...
 - 📫 How to reach me ...
 
