@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Neon Pocket Drum Machine</title>
+  <style>
+    :root {
+      --bg: #090b11;
+      --panel: #101523;
+      --panel-2: #0c1220;
+      --text: #eaf2ff;
+      --muted: #8ea1c9;
+      --neon: #4cf3ff;
+      --neon-2: #9d4dff;
+      --active: #31ffd6;
+      --danger: #ff4d84;
+      --step-size: min(10vw, 52px);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: radial-gradient(circle at 30% -10%, #1a2450 0%, transparent 45%), var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .app {
+      min-height: 100%;
+      padding: max(12px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 14px;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+      border: 1px solid rgba(134, 167, 255, .2);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 30px rgba(0,0,0,.35), inset 0 0 30px rgba(88, 141, 255, .06);
+      backdrop-filter: blur(8px);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1rem, 4vw, 1.3rem);
+      letter-spacing: .03em;
+      font-weight: 700;
+    }
+
+    .controls {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid rgba(131, 186, 255, .35);
+      color: var(--text);
+      background: linear-gradient(180deg, #1a2237, #111826);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform .08s ease, box-shadow .15s ease, border-color .15s ease;
+      min-height: 44px;
+    }
+
+    button:active { transform: translateY(1px) scale(.99); }
+    #playBtn.playing {
+      border-color: var(--active);
+      box-shadow: 0 0 14px rgba(49,255,214,.45);
+    }
+
+    .bpm-wrap {
+      display: grid;
+      gap: 6px;
+      min-width: 200px;
+      flex: 1;
+    }
+
+    .bpm-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--neon);
+      height: 28px;
+    }
+
+    .grid-wrap {
+      padding: 10px;
+      overflow-x: auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 78px repeat(8, var(--step-size));
+      gap: 8px;
+      align-items: center;
+      min-width: max-content;
+    }
+
+    .label {
+      font-weight: 700;
+      color: var(--muted);
+      text-align: right;
+      padding-right: 6px;
+      letter-spacing: .02em;
+      font-size: .92rem;
+    }
+
+    .step {
+      width: var(--step-size);
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      border: 1px solid rgba(120, 151, 230, .35);
+      background: linear-gradient(180deg, #151c2e, #0f1523);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
+      position: relative;
+      overflow: hidden;
+      padding: 0;
+    }
+
+    .step::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 25%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+
+    .step.active {
+      border-color: rgba(76,243,255,.9);
+      box-shadow: 0 0 14px rgba(76,243,255,.45), inset 0 0 24px rgba(76,243,255,.2);
+      background: linear-gradient(160deg, rgba(76,243,255,.22), rgba(157,77,255,.18));
+    }
+
+    .step.active::after { opacity: 1; }
+
+    .step.current {
+      outline: 2px solid rgba(255,255,255,.65);
+      animation: pulse .22s ease;
+    }
+
+    .step.current::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
+      border-radius: inherit;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(.97); }
+      100% { transform: scale(1); }
+    }
+
+    .playhead-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(149, 174, 255, .2);
+      overflow: hidden;
+      position: relative;
+      margin-top: 2px;
+    }
+
+    .playhead {
+      width: 12.5%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--neon), var(--neon-2));
+      transform: translateX(0%);
+      transition: transform .09s linear;
+      box-shadow: 0 0 12px rgba(76,243,255,.7);
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="card header">
+      <h1>Neon Pocket Drum Machine</h1>
+      <span style="color:var(--muted);font-size:.85rem;">8-step • 4 tracks</span>
+    </section>
+
+    <section class="card controls">
+      <div class="top-controls">
+        <button id="playBtn" aria-label="Play or pause">▶ Play</button>
+        <div class="bpm-wrap">
+          <div class="bpm-row"><span>BPM</span><strong id="bpmValue">120</strong></div>
+          <input id="bpm" type="range" min="60" max="180" value="120" />
+        </div>
+      </div>
+      <div class="playhead-track"><div class="playhead" id="playhead"></div></div>
+    </section>
+
+    <section class="card grid-wrap">
+      <div id="grid" class="grid" aria-label="Step sequencer grid"></div>
+    </section>
+  </main>
+
+  <script>
+    const instruments = ["Kick", "Snare", "Hi-Hat", "Clap"];
+    const steps = 8;
+    const pattern = instruments.map(() => Array(steps).fill(false));
+
+    pattern[0][0] = pattern[0][4] = true;
+    pattern[1][2] = pattern[1][6] = true;
+    pattern[2][1] = pattern[2][3] = pattern[2][5] = pattern[2][7] = true;
+    pattern[3][7] = true;
+
+    const gridEl = document.getElementById("grid");
+    const playBtn = document.getElementById("playBtn");
+    const bpmSlider = document.getElementById("bpm");
+    const bpmValue = document.getElementById("bpmValue");
+    const playheadEl = document.getElementById("playhead");
+
+    let audioCtx;
+    let isPlaying = false;
+    let currentStep = 0;
+    let nextNoteTime = 0;
+    let timerId;
+    let lookahead = 25.0;
+    let scheduleAheadTime = 0.12;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function makeNoiseBuffer(duration = 0.25) {
+      const sr = audioCtx.sampleRate;
+      const buffer = audioCtx.createBuffer(1, sr * duration, sr);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+
+    function playKick(time) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(150, time);
+      osc.frequency.exponentialRampToValueAtTime(45, time + 0.12);
+      gain.gain.setValueAtTime(1, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + 0.17);
+    }
+
+    function playSnare(time) {
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = makeNoiseBuffer(0.2);
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = "highpass";
+      noiseFilter.frequency.value = 1200;
+      const noiseGain = audioCtx.createGain();
+      noiseGain.gain.setValueAtTime(0.8, time);
+      noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.14);
+
+      const tone = audioCtx.createOscillator();
+      tone.type = "triangle";
+      tone.frequency.setValueAtTime(200, time);
+      const toneGain = audioCtx.createGain();
+      toneGain.gain.setValueAtTime(0.35, time);
+      toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+
+      noise.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
+      tone.connect(toneGain).connect(audioCtx.destination);
+      noise.start(time);
+      tone.start(time);
+      noise.stop(time + 0.2);
+      tone.stop(time + 0.1);
+    }
+
+    function playHat(time) {
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = makeNoiseBuffer(0.08);
+      const hp = audioCtx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 7000;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.45, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+      noise.connect(hp).connect(gain).connect(audioCtx.destination);
+      noise.start(time);
+      noise.stop(time + 0.07);
+    }
+
+    function playClap(time) {
+      [0, 0.015, 0.03].forEach((offset) => {
+        const n = audioCtx.createBufferSource();
+        n.buffer = makeNoiseBuffer(0.09);
+        const bp = audioCtx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 1700;
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0.6, time + offset);
+        g.gain.exponentialRampToValueAtTime(0.001, time + offset + 0.07);
+        n.connect(bp).connect(g).connect(audioCtx.destination);
+        n.start(time + offset);
+        n.stop(time + offset + 0.08);
+      });
+    }
+
+    function scheduleStep(step, time) {
+      if (pattern[0][step]) playKick(time);
+      if (pattern[1][step]) playSnare(time);
+      if (pattern[2][step]) playHat(time);
+      if (pattern[3][step]) playClap(time);
+
+      const dt = Math.max(0, (time - audioCtx.currentTime) * 1000);
+      setTimeout(() => {
+        document.querySelectorAll(".step.current").forEach((el) => el.classList.remove("current"));
+        for (let row = 0; row < instruments.length; row++) {
+          const cell = document.querySelector(`.step[data-row="${row}"][data-step="${step}"]`);
+          if (cell) cell.classList.add("current");
+        }
+        playheadEl.style.transform = `translateX(${step * 100}%)`;
+      }, dt);
+    }
+
+    function nextStep() {
+      const secondsPerBeat = 60.0 / Number(bpmSlider.value);
+      nextNoteTime += 0.5 * secondsPerBeat;
+      currentStep = (currentStep + 1) % steps;
+    }
+
+    function scheduler() {
+      while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+        scheduleStep(currentStep, nextNoteTime);
+        nextStep();
+      }
+      timerId = setTimeout(scheduler, lookahead);
+    }
+
+    function togglePlay() {
+      initAudio();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      isPlaying = !isPlaying;
+      playBtn.classList.toggle("playing", isPlaying);
+      playBtn.textContent = isPlaying ? "⏸ Pause" : "▶ Play";
+
+      if (isPlaying) {
+        currentStep = 0;
+        nextNoteTime = audioCtx.currentTime + 0.03;
+        scheduler();
+      } else {
+        clearTimeout(timerId);
+        document.querySelectorAll(".step.current").forEach((el) => el.classList.remove("current"));
+      }
+    }
+
+    function renderGrid() {
+      gridEl.innerHTML = "";
+      instruments.forEach((name, row) => {
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = name;
+        gridEl.appendChild(label);
+
+        for (let col = 0; col < steps; col++) {
+          const btn = document.createElement("button");
+          btn.className = "step" + (pattern[row][col] ? " active" : "");
+          btn.setAttribute("data-row", row);
+          btn.setAttribute("data-step", col);
+          btn.setAttribute("aria-label", `${name} step ${col + 1}`);
+          btn.addEventListener("click", () => {
+            pattern[row][col] = !pattern[row][col];
+            btn.classList.toggle("active", pattern[row][col]);
+          });
+          gridEl.appendChild(btn);
+        }
+      });
+    }
+
+    playBtn.addEventListener("click", togglePlay);
+    bpmSlider.addEventListener("input", () => (bpmValue.textContent = bpmSlider.value));
+
+    renderGrid();
+  </script>
+</body>
+</html>
