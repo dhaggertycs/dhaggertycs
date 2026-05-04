@@ -246,12 +246,27 @@
     let isPlaying = false;
     let currentStep = 0;
     let nextNoteTime = 0;
-    let timerId;
-    let lookahead = 25.0;
-    let scheduleAheadTime = 0.12;
+    let timerId = null;
+    const lookahead = 25.0;
+    const scheduleAheadTime = 0.12;
+    let unlocked = false;
 
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function unlockAudio() {
+      initAudio();
+      if (!audioCtx || unlocked) return Promise.resolve();
+      const buffer = audioCtx.createBuffer(1, 1, 22050);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.start(0);
+      source.stop(0);
+      unlocked = true;
+      if (audioCtx.state === "suspended") return audioCtx.resume();
+      return Promise.resolve();
     }
 
     function makeNoiseBuffer(duration = 0.25) {
@@ -343,7 +358,7 @@
           const cell = document.querySelector(`.step[data-row="${row}"][data-step="${step}"]`);
           if (cell) cell.classList.add("current");
         }
-        playheadEl.style.transform = `translateX(${step * 100}%)`;
+        playheadEl.style.transform = `translateX(${step * 100 / steps}%)`;
       }, dt);
     }
 
@@ -361,9 +376,8 @@
       timerId = setTimeout(scheduler, lookahead);
     }
 
-    function togglePlay() {
-      initAudio();
-      if (audioCtx.state === "suspended") audioCtx.resume();
+    async function togglePlay() {
+      await unlockAudio();
       isPlaying = !isPlaying;
       playBtn.classList.toggle("playing", isPlaying);
       playBtn.textContent = isPlaying ? "⏸ Pause" : "▶ Play";
@@ -402,6 +416,7 @@
     }
 
     playBtn.addEventListener("click", togglePlay);
+    document.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
     bpmSlider.addEventListener("input", () => (bpmValue.textContent = bpmSlider.value));
 
     renderGrid();
